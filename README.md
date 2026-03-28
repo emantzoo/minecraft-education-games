@@ -181,6 +181,7 @@ Can't access Minecraft Education? The **[live demo](https://emantzoo.github.io/m
 ## Author
 
 **Eirini Mantzouni** — Data Analyst & Statistical Researcher
+[Portfolio](https://emantzoo.github.io/) · [GitHub](https://github.com/emantzoo)
 
 ---
 
