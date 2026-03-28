@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minecraft Education — Algorithm Games Demo</title>
+  <meta name="description" content="Interactive demos of two educational games built with MakeCode Python for Minecraft Education Edition — animal classification sorting and search strategy comparison." />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0c0f0e; margin: 0; }
+    #root { min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    const CELL = 38;
+    const GAP = 2;
+
+    const GRID_SIZE = 10;
+    const BLOCK_TYPES = { STONE: 0, DIAMOND: 1, LAVA: 2, GOLD: 3 };
+    const BLOCK_COLORS = { 0: "#6b7280", 1: "#22d3ee", 2: "#ef4444", 3: "#eab308" };
+    const BLOCK_VISITED = { 0: "#374151", 1: "#164e63", 2: "#7f1d1d" };
+    const BLOCK_REWARDS = { 0: 3, 1: 5, 2: -5, 3: 10 };
+
+    function generateGrid() {
+      const grid = [];
+      for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+        const r = Math.random() * 100;
+        if (r < 20) grid.push(BLOCK_TYPES.DIAMOND);
+        else if (r < 50) grid.push(BLOCK_TYPES.LAVA);
+        else grid.push(BLOCK_TYPES.STONE);
+      }
+      const goldIdx = Math.floor(Math.random() * grid.length);
+      grid[goldIdx] = BLOCK_TYPES.GOLD;
+      return { grid, goldIdx };
+    }
+
+    function getNeighbors(idx) {
+      const x = idx % GRID_SIZE, y = Math.floor(idx / GRID_SIZE);
+      const n = [];
+      if (y > 0) n.push({ idx: idx - GRID_SIZE, dir: 0 });
+      if (y < GRID_SIZE - 1) n.push({ idx: idx + GRID_SIZE, dir: 1 });
+      if (x < GRID_SIZE - 1) n.push({ idx: idx + 1, dir: 2 });
+      if (x > 0) n.push({ idx: idx - 1, dir: 3 });
+      return n;
+    }
+
+    const ANIMALS = [
+      { name: "Cow", color: "#e07030", category: "FARM", shape: "circle" },
+      { name: "Pig", color: "#f55098", category: "FARM", shape: "triangle" },
+      { name: "Chicken", color: "#f0d040", category: "FARM", shape: "diamond" },
+      { name: "Llama", color: "#a070e0", category: "EXOTIC", shape: "rect" },
+      { name: "Panda", color: "#50c8f0", category: "EXOTIC", shape: "rect" },
+    ];
+
+    const PENS_LUCKY1 = [
+      { label: "Cow Pen", accepts: ["Cow"], color: "#e07030" },
+      { label: "Pig Pen", accepts: ["Pig"], color: "#f55098" },
+      { label: "Chicken", accepts: ["Chicken"], color: "#f0d040" },
+      { label: "Llama", accepts: ["Llama"], color: "#a070e0" },
+      { label: "Panda", accepts: ["Panda"], color: "#50c8f0" },
+    ];
+
+    const PENS_LUCKY2 = [
+      { label: "FARM", accepts: ["Cow", "Pig", "Chicken"], color: "#4ade80" },
+      { label: "EXOTIC", accepts: ["Llama", "Panda"], color: "#fbbf24" },
+    ];
+
+    function spawnAnimals(count = 24) {
+      const animals = [];
+      for (let i = 0; i < count; i++) {
+        const roll = Math.random();
+        let type;
+        if (roll < 0.7) type = [0, 1, 2][Math.floor(Math.random() * 3)];
+        else type = [3, 4][Math.floor(Math.random() * 2)];
+        animals.push({ ...ANIMALS[type], id: i, x: 20 + Math.random() * 320, y: 20 + Math.random() * 160, sorted: false });
+      }
+      return animals;
+    }
+
+    const s = {
+      bg: "#0c0f0e", surface: "#151a18", surfaceRaised: "#1c2320", border: "#2a3330",
+      text: "#e8ede9", muted: "#8a9b90", green: "#4ade80", gold: "#fbbf24",
+      red: "#ef4444", blue: "#60a5fa", cyan: "#22d3ee", codeBg: "#0d1210",
+    };
+    const monoSm = { fontFamily: "monospace", fontSize: "0.72rem" };
+
+    function App() {
+      const [tab, setTab] = useState("game2");
+      return (
+        <div style={{ minHeight: "100vh", background: s.bg, color: s.text, fontFamily: "'Segoe UI', system-ui, sans-serif", padding: "1rem" }}>
+          <div style={{ maxWidth: 920, margin: "0 auto" }}>
+            <h1 style={{ fontSize: "1.35rem", fontWeight: 600, textAlign: "center", marginBottom: "0.2rem" }}>
+              Minecraft Education — Algorithm Games
+            </h1>
+            <p style={{ textAlign: "center", color: s.muted, fontSize: "0.82rem", marginBottom: "1.25rem" }}>
+              Interactive demos and source code for two educational games built with MakeCode Python
+            </p>
+            <div style={{ display: "flex", gap: "0.4rem", justifyContent: "center", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+              {[{ id: "game2", label: "Gold Hunt" }, { id: "game1", label: "Animal Sorter" }, { id: "guide", label: "Source Code & Setup" }].map(t => (
+                <button key={t.id} onClick={() => setTab(t.id)} style={{
+                  padding: "0.5rem 1.1rem", borderRadius: 8,
+                  border: tab === t.id ? `1px solid ${s.green}` : `1px solid ${s.border}`,
+                  background: tab === t.id ? "rgba(74,222,128,0.1)" : s.surface,
+                  color: tab === t.id ? s.green : s.muted, cursor: "pointer", fontSize: "0.78rem", fontWeight: 500,
+                }}>{t.label}</button>
+              ))}
+            </div>
+            {tab === "game2" && <GoldHuntDemo />}
+            {tab === "game1" && <AnimalSortDemo />}
+            {tab === "guide" && <GuideTab />}
+          </div>
+        </div>
+      );
+    }
+
+    function GoldHuntDemo() {
+      const [gridData, setGridData] = useState(() => generateGrid());
+      const [algo, setAlgo] = useState("random");
+      const [running, setRunning] = useState(false);
+      const [agentPos, setAgentPos] = useState(-1);
+      const [visited, setVisited] = useState(new Set());
+      const [score, setScore] = useState(0);
+      const [steps, setSteps] = useState(0);
+      const [foundGold, setFoundGold] = useState(false);
+      const [log, setLog] = useState([]);
+      const runRef = useRef(false);
+      const speedRef = useRef(150);
+
+      const reset = useCallback(() => {
+        runRef.current = false; setRunning(false);
+        setGridData(generateGrid()); setAgentPos(-1); setVisited(new Set());
+        setScore(0); setSteps(0); setFoundGold(false); setLog([]);
+      }, []);
+
+      const delay = (ms) => new Promise(r => setTimeout(r, ms));
+
+      const runAlgo = useCallback(async () => {
+        runRef.current = true; setRunning(true);
+        setVisited(new Set()); setScore(0); setSteps(0); setFoundGold(false); setLog([]);
+        const { grid, goldIdx } = gridData;
+        let start; do { start = Math.floor(Math.random() * 100); } while (start === goldIdx);
+        setAgentPos(start);
+        let pos = start, sc = 0, st = 0, vis = new Set([pos]), lastDir = -1;
+        setVisited(new Set(vis));
+        const addLog = (msg) => setLog(prev => [...prev.slice(-6), msg]);
+        addLog(`Agent starts at cell ${pos}`);
+        await delay(400);
+
+        while (st < 80 && runRef.current) {
+          if (pos === goldIdx) { setFoundGold(true); addLog(`GOLD found in ${st} steps! Score: ${sc}`); break; }
+          const neighbors = getNeighbors(pos);
+          let next = -1;
+          if (algo === "random") {
+            next = neighbors[Math.floor(Math.random() * neighbors.length)].idx;
+          } else if (algo === "greedy") {
+            let bv = -9999, cands = [];
+            for (const n of neighbors) { const v = BLOCK_REWARDS[grid[n.idx]] || 0; if (v > bv) { bv = v; cands = [n.idx]; } else if (v === bv) cands.push(n.idx); }
+            next = cands[Math.floor(Math.random() * cands.length)];
+          } else if (algo === "greedy_noback") {
+            let bv = -9999, cands = [];
+            for (const n of neighbors) {
+              if (lastDir !== -1 && n.dir === (lastDir ^ 1)) continue;
+              const v = BLOCK_REWARDS[grid[n.idx]] || 0;
+              if (v > bv) { bv = v; cands = [{ idx: n.idx, dir: n.dir }]; } else if (v === bv) cands.push({ idx: n.idx, dir: n.dir });
+            }
+            if (cands.length === 0) for (const n of neighbors) cands.push({ idx: n.idx, dir: n.dir });
+            const ch = cands[Math.floor(Math.random() * cands.length)]; next = ch.idx; lastDir = ch.dir;
+          } else if (algo === "greedy_avoid") {
+            let bv = -9999, cands = [], wool = [];
+            for (const n of neighbors) {
+              if (lastDir !== -1 && n.dir === (lastDir ^ 1)) continue;
+              const v = BLOCK_REWARDS[grid[n.idx]] || 0;
+              if (!vis.has(n.idx)) { if (v > bv) { bv = v; cands = [{ idx: n.idx, dir: n.dir }]; } else if (v === bv) cands.push({ idx: n.idx, dir: n.dir }); }
+              else wool.push({ idx: n.idx, dir: n.dir });
+            }
+            if (cands.length === 0) cands = wool;
+            if (cands.length === 0) for (const n of neighbors) cands.push({ idx: n.idx, dir: n.dir });
+            const ch = cands[Math.floor(Math.random() * cands.length)]; next = ch.idx; lastDir = ch.dir;
+          }
+          if (next === -1) break;
+          pos = next; const reward = BLOCK_REWARDS[grid[pos]] || 0; sc += reward; st += 1; vis.add(pos);
+          setAgentPos(pos); setVisited(new Set(vis)); setScore(sc); setSteps(st);
+          addLog(`Step ${st}: cell ${pos} (${reward >= 0 ? "+" : ""}${reward}) total: ${sc}`);
+          await delay(speedRef.current);
+        }
+        if (pos !== goldIdx && runRef.current) addLog(`Finished ${st} steps. Final score: ${sc}`);
+        runRef.current = false; setRunning(false);
+      }, [gridData, algo]);
+
+      const { grid, goldIdx } = gridData;
+      const gridW = GRID_SIZE * (CELL + GAP) - GAP;
+
+      return (
+        <div>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem", alignItems: "center" }}>
+            <select value={algo} onChange={e => setAlgo(e.target.value)} disabled={running}
+              style={{ padding: "0.45rem 0.75rem", borderRadius: 6, border: `1px solid ${s.border}`, background: s.surface, color: s.text, fontSize: "0.8rem" }}>
+              <option value="random">Random Walk</option>
+              <option value="greedy">Greedy</option>
+              <option value="greedy_noback">Greedy + No Backtrack</option>
+              <option value="greedy_avoid">Greedy + Avoid Visited</option>
+            </select>
+            <button onClick={running ? () => { runRef.current = false; setRunning(false); } : runAlgo}
+              style={{ padding: "0.45rem 1rem", borderRadius: 6, border: "none", background: running ? s.red : s.green, color: s.bg, fontSize: "0.8rem", fontWeight: 600, cursor: "pointer" }}>
+              {running ? "Stop" : "Run"}</button>
+            <button onClick={reset} disabled={running}
+              style={{ padding: "0.45rem 0.75rem", borderRadius: 6, border: `1px solid ${s.border}`, background: s.surface, color: s.muted, fontSize: "0.8rem", cursor: running ? "default" : "pointer", opacity: running ? 0.4 : 1 }}>
+              New Grid</button>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginLeft: "auto" }}>
+              <span style={{ fontSize: "0.7rem", color: s.muted }}>Speed:</span>
+              <input type="range" min={30} max={400} defaultValue={150} onChange={e => speedRef.current = 430 - Number(e.target.value)} style={{ width: 80, accentColor: s.green }} />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "1.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+            {[{ l: "Steps", v: steps, c: s.text }, { l: "Score", v: score, c: score >= 0 ? s.green : s.red }, { l: "Visited", v: visited.size, c: s.blue }, { l: "Status", v: foundGold ? "GOLD FOUND" : running ? "Searching..." : "Ready", c: foundGold ? s.gold : s.muted }].map(x => (
+              <div key={x.l} style={{ fontSize: "0.75rem" }}><span style={{ color: s.muted }}>{x.l}: </span><span style={{ color: x.c, fontWeight: 600, ...monoSm }}>{x.v}</span></div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+            <div style={{ background: s.surface, border: `1px solid ${s.border}`, borderRadius: 12, padding: "1rem", flexShrink: 0 }}>
+              <svg width={gridW} height={gridW} viewBox={`0 0 ${gridW} ${gridW}`}>
+                {grid.map((block, i) => {
+                  const x = (i % GRID_SIZE) * (CELL + GAP), y = Math.floor(i / GRID_SIZE) * (CELL + GAP);
+                  const isV = visited.has(i) && i !== agentPos && block !== BLOCK_TYPES.GOLD;
+                  const isA = i === agentPos, isG = block === BLOCK_TYPES.GOLD;
+                  const fill = isA ? s.green : isG ? s.gold : isV ? (BLOCK_VISITED[block] || "#374151") : BLOCK_COLORS[block];
+                  return (<g key={i}>
+                    <rect x={x} y={y} width={CELL} height={CELL} rx={4} fill={fill} stroke={isA ? s.green : isG ? s.gold : "none"} strokeWidth={isA || isG ? 2 : 0} opacity={isV && !isA ? 0.5 : 1} />
+                    {isA && <><circle cx={x+CELL/2} cy={y+CELL/2} r={8} fill={s.bg} opacity={0.6}/><circle cx={x+CELL/2} cy={y+CELL/2} r={5} fill={s.green}><animate attributeName="r" values="4;6;4" dur="1s" repeatCount="indefinite"/></circle></>}
+                    {isG && !isA && <circle cx={x+CELL/2} cy={y+CELL/2} r={10} fill="none" stroke={s.gold} strokeWidth={1} opacity={0.4}><animate attributeName="r" values="8;14;8" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.4;0;0.4" dur="2s" repeatCount="indefinite"/></circle>}
+                    {isV && !isA && !isG && <text x={x+CELL/2} y={y+CELL/2+1} textAnchor="middle" dominantBaseline="middle" fill="#fff" fontSize={8} opacity={0.3}>·</text>}
+                  </g>);
+                })}
+              </svg>
+              <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.75rem", flexWrap: "wrap" }}>
+                {[{ c: "#6b7280", l: "Stone +3" }, { c: "#22d3ee", l: "Diamond +5" }, { c: "#ef4444", l: "Lava -5" }, { c: "#eab308", l: "Gold +10" }, { c: "#4ade80", l: "Agent" }].map(l => (
+                  <div key={l.l} style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}><div style={{ width: 10, height: 10, borderRadius: 2, background: l.c }}/><span style={{ fontSize: "0.65rem", color: s.muted }}>{l.l}</span></div>
+                ))}
+              </div>
+            </div>
+            <div style={{ flex: 1, minWidth: 200, background: s.codeBg, border: `1px solid ${s.border}`, borderRadius: 12, padding: "1rem", ...monoSm, color: s.muted, display: "flex", flexDirection: "column", gap: "0.3rem", maxHeight: 440, overflow: "hidden" }}>
+              <div style={{ color: s.green, fontSize: "0.7rem", marginBottom: "0.5rem", letterSpacing: "0.05em" }}>AGENT LOG</div>
+              {log.length === 0 && <div style={{ opacity: 0.4 }}>Select an algorithm and press Run...</div>}
+              {log.map((l, i) => (<div key={i} style={{ color: l.includes("GOLD") ? s.gold : l.includes("-") && !l.includes("total") ? s.red : s.muted, lineHeight: 1.4 }}>{l}</div>))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function AnimalSortDemo() {
+      const [mode, setMode] = useState("lucky1");
+      const [animals, setAnimals] = useState(() => spawnAnimals(24));
+      const [running, setRunning] = useState(false);
+      const [agentPos, setAgentPos] = useState({ x: 180, y: 100 });
+      const [sorted, setSorted] = useState(0);
+      const [log, setLog] = useState([]);
+      const runRef = useRef(false);
+      const speedRef = useRef(200);
+      const pens = mode === "lucky1" ? PENS_LUCKY1 : PENS_LUCKY2;
+      const fieldW = 380, fieldH = 200, penAreaY = 260;
+      const penW = mode === "lucky1" ? 68 : 170;
+      const totalPenW = pens.length * (penW + 8) - 8;
+      const penStartX = (fieldW - totalPenW) / 2;
+
+      const reset = useCallback(() => { runRef.current = false; setRunning(false); setAnimals(spawnAnimals(24)); setAgentPos({ x: 180, y: 100 }); setSorted(0); setLog([]); }, []);
+      useEffect(() => { reset(); }, [mode]);
+      const delay = (ms) => new Promise(r => setTimeout(r, ms));
+
+      const runSort = useCallback(async () => {
+        runRef.current = true; setRunning(true); setLog([]); setSorted(0);
+        const addLog = (msg) => setLog(prev => [...prev.slice(-8), msg]);
+        addLog("Agent begins patrol...");
+        let cur = [...animals], sc = 0;
+        for (let round = 0; round < 10 && runRef.current; round++) {
+          const agX = 30 + Math.random() * (fieldW - 60), agY = 20 + Math.random() * (fieldH - 40);
+          setAgentPos({ x: agX, y: agY }); addLog(`Move #${round + 1}: scanning area...`);
+          await delay(speedRef.current * 2);
+          const nearby = cur.filter(a => !a.sorted && Math.abs(a.x - agX) < 80 && Math.abs(a.y - agY) < 80);
+          if (nearby.length === 0) { addLog("No unsorted animals nearby"); await delay(speedRef.current); continue; }
+          for (const animal of nearby) {
+            if (!runRef.current) break;
+            const penIdx = pens.findIndex(p => p.accepts.includes(animal.name));
+            if (penIdx === -1) continue;
+            const penX = penStartX + penIdx * (penW + 8) + penW / 2 + Math.random() * 20 - 10;
+            const penY = penAreaY + 20 + Math.random() * 30;
+            cur = cur.map(a => a.id === animal.id ? { ...a, x: penX, y: penY, sorted: true } : a);
+            sc++; setAnimals([...cur]); setSorted(sc);
+            addLog(`${animal.name} -> ${pens[penIdx].label}`);
+            await delay(speedRef.current);
+          }
+        }
+        if (runRef.current) { const rem = cur.filter(a => !a.sorted).length; addLog(rem > 0 ? `Done! ${rem} unsorted` : "All animals sorted!"); }
+        runRef.current = false; setRunning(false);
+      }, [animals, mode, pens, penStartX, penW]);
+
+      return (
+        <div>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem", alignItems: "center" }}>
+            <select value={mode} onChange={e => setMode(e.target.value)} disabled={running}
+              style={{ padding: "0.45rem 0.75rem", borderRadius: 6, border: `1px solid ${s.border}`, background: s.surface, color: s.text, fontSize: "0.8rem" }}>
+              <option value="lucky1">lucky1 — Sort by Type (5 pens)</option>
+              <option value="lucky2">lucky2 — Sort by Category (2 pens)</option>
+            </select>
+            <button onClick={running ? () => { runRef.current = false; setRunning(false); } : runSort}
+              style={{ padding: "0.45rem 1rem", borderRadius: 6, border: "none", background: running ? s.red : s.green, color: s.bg, fontSize: "0.8rem", fontWeight: 600, cursor: "pointer" }}>
+              {running ? "Stop" : "Run"}</button>
+            <button onClick={reset} disabled={running}
+              style={{ padding: "0.45rem 0.75rem", borderRadius: 6, border: `1px solid ${s.border}`, background: s.surface, color: s.muted, fontSize: "0.8rem", cursor: running ? "default" : "pointer", opacity: running ? 0.4 : 1 }}>
+              Respawn</button>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginLeft: "auto" }}>
+              <span style={{ fontSize: "0.7rem", color: s.muted }}>Speed:</span>
+              <input type="range" min={50} max={500} defaultValue={200} onChange={e => speedRef.current = 550 - Number(e.target.value)} style={{ width: 80, accentColor: s.green }} />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "1.5rem", marginBottom: "1rem" }}>
+            <div style={{ fontSize: "0.75rem" }}><span style={{ color: s.muted }}>Sorted: </span><span style={{ color: s.green, fontWeight: 600, ...monoSm }}>{sorted}/{animals.length}</span></div>
+            <div style={{ fontSize: "0.75rem" }}><span style={{ color: s.muted }}>Mode: </span><span style={{ color: s.gold, fontWeight: 600, ...monoSm }}>{mode === "lucky1" ? "Fine-grained (5 types)" : "Coarse (2 categories)"}</span></div>
+          </div>
+          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+            <div style={{ background: s.surface, border: `1px solid ${s.border}`, borderRadius: 12, padding: "1rem", flexShrink: 0 }}>
+              <svg width={fieldW} height={340} viewBox={`0 0 ${fieldW} 340`}>
+                <rect x={0} y={0} width={fieldW} height={fieldH + 20} rx={8} fill={s.surfaceRaised} stroke={s.border} strokeWidth={1}/>
+                <text x={fieldW/2} y={14} textAnchor="middle" fill={s.muted} fontSize={9} opacity={0.5}>SPAWNING FIELD</text>
+                {pens.map((pen, i) => { const px = penStartX + i * (penW + 8); return (<g key={pen.label}>
+                  <rect x={px} y={penAreaY-10} width={penW} height={70} rx={6} fill="none" stroke={pen.color} strokeWidth={1.5} strokeDasharray="4 2" opacity={0.4}/>
+                  <text x={px+penW/2} y={penAreaY+2} textAnchor="middle" fill={pen.color} fontSize={mode==="lucky1"?7.5:10} fontWeight={600} opacity={0.7}>{pen.label}</text>
+                </g>); })}
+                {animals.map(a => {
+                  const op = a.sorted ? 0.9 : 0.7;
+                  const strk = a.sorted ? s.green : "none";
+                  let shape;
+                  if (a.shape === "circle") shape = <circle r={7} fill={a.color} opacity={op} stroke={strk} strokeWidth={1}/>;
+                  else if (a.shape === "rect") shape = <rect x={-7} y={-7} width={14} height={14} rx={2} fill={a.color} opacity={op} stroke={strk} strokeWidth={1}/>;
+                  else if (a.shape === "triangle") shape = <polygon points="0,-8 7,6 -7,6" fill={a.color} opacity={op} stroke={strk} strokeWidth={1}/>;
+                  else if (a.shape === "diamond") shape = <polygon points="0,-8 8,0 0,8 -8,0" fill={a.color} opacity={op} stroke={strk} strokeWidth={1}/>;
+                  return (<g key={a.id} style={{ transition: "transform 0.4s ease", transform: `translate(${a.x}px, ${a.y}px)` }}>
+                    {shape}
+                    <text y={-12} textAnchor="middle" fill={a.color} fontSize={6} opacity={0.6}>{a.name}</text>
+                  </g>);
+                })}
+                <g style={{ transition: "transform 0.3s ease", transform: `translate(${agentPos.x}px, ${agentPos.y}px)` }}>
+                  <circle r={18} fill="none" stroke={s.green} strokeWidth={1} opacity={0.15}><animate attributeName="r" values="18;40;18" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.15;0;0.15" dur="2s" repeatCount="indefinite"/></circle>
+                  <circle r={6} fill={s.green}><animate attributeName="r" values="5;7;5" dur="1s" repeatCount="indefinite"/></circle>
+                  <circle r={3} fill={s.bg}/>
+                </g>
+              </svg>
+              <div style={{ display: "flex", gap: "0.6rem", marginTop: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+                {ANIMALS.map(a => (
+                  <div key={a.name} style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                    <svg width={12} height={12} viewBox="-7 -7 14 14">
+                      {a.shape === "circle" && <circle r={5} fill={a.color}/>}
+                      {a.shape === "rect" && <rect x={-5} y={-5} width={10} height={10} rx={1} fill={a.color}/>}
+                      {a.shape === "triangle" && <polygon points="0,-5 5,4 -5,4" fill={a.color}/>}
+                      {a.shape === "diamond" && <polygon points="0,-5 5,0 0,5 -5,0" fill={a.color}/>}
+                    </svg>
+                    <span style={{ fontSize: "0.6rem", color: s.muted }}>{a.name}</span>
+                  </div>
+                ))}
+                <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: s.green }}/><span style={{ fontSize: "0.6rem", color: s.muted }}>Agent</span></div>
+              </div>
+            </div>
+            <div style={{ flex: 1, minWidth: 180, background: s.codeBg, border: `1px solid ${s.border}`, borderRadius: 12, padding: "1rem", ...monoSm, color: s.muted, display: "flex", flexDirection: "column", gap: "0.3rem", maxHeight: 400, overflow: "hidden" }}>
+              <div style={{ color: s.green, fontSize: "0.7rem", marginBottom: "0.5rem", letterSpacing: "0.05em" }}>SORTING LOG</div>
+              {log.length === 0 && <div style={{ opacity: 0.4 }}>Select a mode and press Run...</div>}
+              {log.map((l, i) => (<div key={i} style={{ color: l.includes("->") ? s.green : l.includes("All animals") || l.includes("Done") ? s.gold : s.muted, lineHeight: 1.4 }}>{l}</div>))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function GuideTab() {
+      const [openSection, setOpenSection] = useState("setup");
+      const Section = ({ id, title, children }) => {
+        const open = openSection === id;
+        return (
+          <div style={{ background: s.surface, border: `1px solid ${s.border}`, borderRadius: 12, padding: "1.25rem", marginBottom: "0.75rem", cursor: "pointer" }} onClick={() => setOpenSection(open ? null : id)}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ fontSize: "0.95rem", fontWeight: 600, color: open ? s.green : s.text }}>{title}</h3>
+              <span style={{ color: s.muted, fontSize: "1.1rem", transition: "transform 0.2s", transform: open ? "rotate(45deg)" : "rotate(0)" }}>+</span>
+            </div>
+            {open && <div onClick={e => e.stopPropagation()} style={{ marginTop: "1rem", cursor: "default" }}>{children}</div>}
+          </div>
+        );
+      };
+      const Step = ({ n, children }) => (
+        <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem", alignItems: "flex-start" }}>
+          <div style={{ width: 24, height: 24, borderRadius: "50%", background: "rgba(74,222,128,0.15)", color: s.green, fontSize: "0.75rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>{n}</div>
+          <div style={{ fontSize: "0.85rem", color: s.muted, lineHeight: 1.6 }}>{children}</div>
+        </div>
+      );
+      const CodeBox = ({ title, code }) => (
+        <div style={{ background: s.codeBg, border: `1px solid ${s.border}`, borderRadius: 8, padding: "1rem", margin: "0.75rem 0" }}>
+          {title && <div style={{ ...monoSm, color: s.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem", paddingBottom: "0.5rem", borderBottom: `1px solid ${s.border}` }}>{title}</div>}
+          <pre style={{ ...monoSm, color: s.muted, whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: 1.65 }}>{code}</pre>
+        </div>
+      );
+
+      return (
+        <div>
+          <Section id="setup" title="How to Install & Play">
+            <div>
+              <h4 style={{ fontSize: "0.85rem", color: s.green, marginBottom: "0.75rem" }}>Installing .mcworld files (Minecraft worlds)</h4>
+              <Step n={1}>Download the <b style={{ color: s.text }}>.mcworld</b> file to your computer.</Step>
+              <Step n={2}>Double-click the file, or right-click and choose <b style={{ color: s.text }}>Open with Minecraft Education Edition</b>.</Step>
+              <Step n={3}>Minecraft Education will open and automatically import the world.</Step>
+              <Step n={4}>Find the world in your world list when starting the game.</Step>
+              <h4 style={{ fontSize: "0.85rem", color: s.green, marginBottom: "0.75rem", marginTop: "1.5rem" }}>Importing .mkcd code files (MakeCode projects)</h4>
+              <Step n={1}>Open a world in Minecraft Education and press <b style={{ color: s.text }}>C</b> to open Code Builder.</Step>
+              <Step n={2}>Select <b style={{ color: s.text }}>MakeCode</b> as your coding platform.</Step>
+              <Step n={3}>Click <b style={{ color: s.text }}>Import</b>, then <b style={{ color: s.text }}>Import File</b>.</Step>
+              <Step n={4}>Browse to the <b style={{ color: s.text }}>.mkcd</b> file and open it.</Step>
+              <Step n={5}>The code loads in the editor — you can edit or run it immediately.</Step>
+              <div style={{ marginTop: "1.25rem", padding: "1rem", background: "rgba(74,222,128,0.05)", border: `1px solid rgba(74,222,128,0.15)`, borderRadius: 8 }}>
+                <p style={{ fontSize: "0.82rem", color: s.muted, lineHeight: 1.6 }}>
+                  <b style={{ color: s.green }}>Note:</b> Minecraft Education Edition requires a school or organization license. If you don't have access, the interactive demos in the other two tabs simulate the actual game behavior faithfully.
+                </p>
+              </div>
+            </div>
+          </Section>
+
+          <Section id="game1_guide" title="Game 1: Animal Classification — Commands & Gameplay">
+            <div>
+              <p style={{ fontSize: "0.85rem", color: s.muted, marginBottom: "1rem", lineHeight: 1.6 }}>
+                Before each sorting run, always <b style={{ color: s.text }}>clear</b> first, then <b style={{ color: s.text }}>spawn</b>. This ensures clean results.
+              </p>
+              {[
+                { cmd: "clear", desc: "Removes all animals by teleporting them out of the region. Always run this first." },
+                { cmd: "spawn", desc: "Spawns 50 animals: 70% farm (Cow, Pig, Chicken), 30% exotic (Llama, Panda)." },
+                { cmd: "lucky1", desc: "Exact Classification — agent sorts each animal into its own pen (5 types, 5 pens)." },
+                { cmd: "lucky2", desc: "Broad Categorization — agent sorts into 2 groups: FARM and EXOTIC." },
+              ].map(c => (
+                <div key={c.cmd} style={{ display: "flex", gap: "0.75rem", marginBottom: "0.6rem" }}>
+                  <code style={{ color: s.green, ...monoSm, fontWeight: 600, flexShrink: 0, minWidth: 60 }}>{c.cmd}</code>
+                  <span style={{ fontSize: "0.82rem", color: s.muted }}>{c.desc}</span>
+                </div>
+              ))}
+              <p style={{ fontSize: "0.82rem", color: s.muted, marginTop: "1rem", lineHeight: 1.6 }}>
+                <b style={{ color: s.text }}>Learning objective:</b> Compare fine-grained vs. coarse classification. Observe the tradeoff between precision and speed.
+              </p>
+            </div>
+          </Section>
+
+          <Section id="game2_guide" title="Game 2: Gold Hunt — Commands & Gameplay">
+            <div>
+              {[
+                { cmd: "setup", desc: "Places agent at a random position and resets the environment." },
+                { cmd: "fillframe", desc: "Generates a new 10x10 grid: 50% stone (+3), 30% lava (-5), 20% diamond (+5), 1 gold (+10)." },
+                { cmd: "rand", desc: "Random Walk — baseline with no reward awareness." },
+                { cmd: "greedy", desc: "Greedy — picks highest-reward neighbor each step." },
+                { cmd: "greedy_noback", desc: "Greedy + prevents reversal using XOR on direction indices." },
+                { cmd: "greedy_avoid_wool", desc: "Greedy + avoids visited cells, falls back to visited when trapped." },
+                { cmd: "test_paths", desc: "Runs 5 trials, computes reward/step ratios to find best path." },
+              ].map(c => (
+                <div key={c.cmd} style={{ display: "flex", gap: "0.75rem", marginBottom: "0.6rem" }}>
+                  <code style={{ color: s.gold, ...monoSm, fontWeight: 600, flexShrink: 0, minWidth: 140 }}>{c.cmd}</code>
+                  <span style={{ fontSize: "0.82rem", color: s.muted }}>{c.desc}</span>
+                </div>
+              ))}
+              <p style={{ fontSize: "0.82rem", color: s.muted, marginTop: "1rem", lineHeight: 1.6 }}>
+                <b style={{ color: s.text }}>Goal:</b> Find the gold block while maximizing your score. Compare how different strategies perform on the same grid.
+              </p>
+            </div>
+          </Section>
+
+          <Section id="code1" title="Source Code — Game 1 (Animal Sorting)">
+            <CodeBox title="main.py — key excerpt" code={`# 70/30 weighted spawn distribution
+def spawn_animals():
+    count = 0
+    while count < total_spawns:
+        roll = Math.random_range(1, 10)
+        if roll <= 7:    # 70% Farm
+            pick = Math.random_range(1, 3)
+            if pick == 1:   mob = COW
+            elif pick == 2: mob = PIG
+            else:           mob = CHICKEN
+        else:            # 30% Exotic
+            pick = Math.random_range(1, 2)
+            if pick == 1: mob = LLAMA
+            else:         mob = PANDA
+        spawn_pos = randpos(corner1, corner2)
+        mobs.spawn(mob, spawn_pos)
+        count += 1
+
+# lucky1: Sort each mob to its own pen
+def move_nearby_animals_to_pens_by_type(radius):
+    agent_pos = agent.get_position()
+    i = 0
+    while i < NUM_MOB_TYPES:
+        nearby = mobs.near(
+            mobs.entities_by_type(mob_types[i]),
+            agent_pos, radius)
+        mobs.teleport_to_position(
+            nearby, pen_locations[i])
+        i += 1
+
+# lucky2: Sort by broad category
+def move_nearby_animals_to_pens_by_category(radius):
+    agent_pos = agent.get_position()
+    for cat in categories:
+        for mob_type in cat["mobs"]:
+            nearby = mobs.near(
+                mobs.entities_by_type(mob_type),
+                agent_pos, radius)
+            mobs.teleport_to_position(
+                nearby, cat["pen"])`} />
+          </Section>
+
+          <Section id="code2" title="Source Code — Game 2 (Gold Hunt)">
+            <CodeBox title="main.py — key excerpts" code={`# Block reward system
+# Stone=+3, Diamond=+5, Lava=-5, Gold=+10
+
+# Greedy + backtrack prevention (XOR trick)
+# Directions: 0=N, 1=S, 2=E, 3=W
+# XOR^1 gives opposite: 0^1=1, 2^1=3
+if last_move_idx != -1 \\
+   and index == (last_move_idx ^ 1):
+    continue  # Skip opposite direction
+
+# Visited-state tracking via wool markers
+def mark_visited(x, y, z):
+    block_below = positions.create_world(x, y-1, z)
+    if blocks.test_for_block(STONE, block_below):
+        blocks.place(GRAY_WOOL, block_below)
+    elif blocks.test_for_block(DIAMOND_BLOCK, ...):
+        blocks.place(LIGHT_BLUE_WOOL, block_below)
+    elif blocks.test_for_block(LAVA, block_below):
+        blocks.place(ORANGE_WOOL, block_below)
+
+# Greedy + avoid visited (wool) cells
+if not is_wool(nx, ay, nz):
+    val = get_reward(nx, ay, nz, False)
+    if val > best_val:
+        candidates = [[nx, nz, index]]
+else:
+    wool_candidates.append([nx, nz, index])
+# Fallback when all neighbors are visited
+if len(candidates) == 0:
+    candidates = wool_candidates`} />
+          </Section>
+
+          <Section id="skills" title="Transferable Skills Demonstrated">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.75rem" }}>
+              {[
+                { t: "Algorithm Design", c: s.green, d: "Fisher-Yates shuffle, greedy search with tiebreaking, backtracking prevention via bitwise XOR, multi-trial path evaluation with reward/step ratios" },
+                { t: "Data & Probability", c: s.gold, d: "Weighted probability distributions (70/30), procedural grid generation with block-type probabilities, cumulative scoring systems" },
+                { t: "Educational Design", c: s.cyan, d: "Tangible algorithm comparison (random vs greedy vs greedy+memory), visual state tracking via wool markers, progressive complexity" },
+                { t: "Technical Execution", c: s.blue, d: "MakeCode Python within Minecraft constraints (no len(), limited stdlib), spatial coordinate systems, agent-based simulation" },
+              ].map(sk => (
+                <div key={sk.t} style={{ background: s.codeBg, border: `1px solid ${s.border}`, borderRadius: 8, padding: "1rem" }}>
+                  <h5 style={{ ...monoSm, color: sk.c, marginBottom: "0.5rem" }}>{sk.t}</h5>
+                  <p style={{ fontSize: "0.8rem", color: s.muted, lineHeight: 1.5 }}>{sk.d}</p>
+                </div>
+              ))}
+            </div>
+          </Section>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
