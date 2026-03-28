@@ -56,6 +56,17 @@ minecraft-education-games/
 
 ---
 
+## Download Game Files
+
+| Game | World (.mcworld) | Code (.mkcd) |
+|------|-------------------|--------------|
+| Game 1: Animal Sorting | [game1-sorting.mcworld](https://github.com/emantzoo/minecraft-education-games/raw/main/worlds/game1-sorting.mcworld) | [game1-sorting.mkcd](https://github.com/emantzoo/minecraft-education-games/raw/main/code/game1-sorting.mkcd) |
+| Game 2: Gold Hunt | [game2-goldhunt.mcworld](https://github.com/emantzoo/minecraft-education-games/raw/main/worlds/game2-goldhunt.mcworld) | [game2-goldhunt.mkcd](https://github.com/emantzoo/minecraft-education-games/raw/main/code/game2-goldhunt.mkcd) |
+
+> Download the `.mcworld` file and double-click it to import the world into Minecraft Education. Then import the matching `.mkcd` file via Code Builder.
+
+---
+
 ## Getting Started
 
 ### Requirements
@@ -65,7 +76,7 @@ minecraft-education-games/
 
 ### Installing the Worlds (.mcworld)
 
-1. Download the `.mcworld` file from the `worlds/` folder
+1. Download the `.mcworld` file from the table above (or from the `worlds/` folder)
 2. Double-click the file (or right-click → Open with → Minecraft Education Edition)
 3. The world imports automatically and appears in your world list
 
@@ -74,7 +85,7 @@ minecraft-education-games/
 1. Open the imported world and press **C** to open Code Builder
 2. Select **MakeCode** as the coding platform
 3. Click **Import** → **Import File**
-4. Browse to the `.mkcd` file from the `code/` folder
+4. Browse to the `.mkcd` file (downloaded from the table above or from the `code/` folder)
 5. The code loads in the editor — run it or edit it
 
 ### Playing Game 1 (Animal Sorting)
