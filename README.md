@@ -49,9 +49,8 @@ minecraft-education-games/
 ├── code/
 │   ├── game1-sorting.mkcd           # MakeCode project — sorting game
 │   └── game2-goldhunt.mkcd          # MakeCode project — gold hunt
-├── demo/
-│   └── index.html                   # Interactive browser demo (GitHub Pages)
 └── docs/
+    ├── index.html                   # Interactive browser demo (GitHub Pages)
     └── setup-instructions.md        # Installation guide
 ```
 
