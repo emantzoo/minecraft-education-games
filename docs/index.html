@@ -104,11 +104,12 @@
             <p style={{ textAlign: "center", color: s.muted, fontSize: "0.82rem", marginBottom: "0.5rem" }}>
               Interactive demos and source code for two educational games built with MakeCode Python
             </p>
-            <p style={{ textAlign: "center", fontSize: "0.75rem", marginBottom: "1.25rem" }}>
-              <a href="https://emantzoo.github.io/" style={{ color: s.green, textDecoration: "none" }}>Portfolio</a>
-              <span style={{ color: s.muted, margin: "0 0.4rem" }}>·</span>
-              <a href="https://github.com/emantzoo/minecraft-education-games" style={{ color: s.muted, textDecoration: "none" }}>GitHub Repo</a>
-            </p>
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center", marginBottom: "1.25rem", flexWrap: "wrap" }}>
+              <a href="game1-sorting.mcworld" download style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", padding: "0.35rem 0.75rem", borderRadius: 6, border: `1px solid ${s.green}`, background: "rgba(74,222,128,0.1)", color: s.green, textDecoration: "none", fontSize: "0.72rem", fontWeight: 500 }}>⬇ Game 1 .mcworld</a>
+              <a href="game1-sorting.mkcd" download style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", padding: "0.35rem 0.75rem", borderRadius: 6, border: `1px solid ${s.green}`, background: "rgba(74,222,128,0.1)", color: s.green, textDecoration: "none", fontSize: "0.72rem", fontWeight: 500 }}>⬇ Game 1 .mkcd</a>
+              <a href="game2-goldhunt.mcworld" download style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", padding: "0.35rem 0.75rem", borderRadius: 6, border: `1px solid ${s.gold}`, background: "rgba(251,191,36,0.1)", color: s.gold, textDecoration: "none", fontSize: "0.72rem", fontWeight: 500 }}>⬇ Game 2 .mcworld</a>
+              <a href="game2-goldhunt.mkcd" download style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", padding: "0.35rem 0.75rem", borderRadius: 6, border: `1px solid ${s.gold}`, background: "rgba(251,191,36,0.1)", color: s.gold, textDecoration: "none", fontSize: "0.72rem", fontWeight: 500 }}>⬇ Game 2 .mkcd</a>
+            </div>
             <div style={{ display: "flex", gap: "0.4rem", justifyContent: "center", marginBottom: "1.5rem", flexWrap: "wrap" }}>
               {[{ id: "game2", label: "Gold Hunt" }, { id: "game1", label: "Animal Sorter" }, { id: "guide", label: "Source Code & Setup" }].map(t => (
                 <button key={t.id} onClick={() => setTab(t.id)} style={{
