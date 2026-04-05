@@ -1,5 +1,8 @@
 # Teaching Algorithms Through Minecraft Education Edition
 
+![Minecraft Education](https://raw.githubusercontent.com/emantzoo/emantzoo.github.io/master/images/minecraft-education.jpg)
+
+
 Two educational games built with **MakeCode Python** for Minecraft Education Edition that make classification, search strategies, and optimization tangible through gameplay.
 
 **[Live Interactive Demo](https://emantzoo.github.io/minecraft-education-games/)** — try the algorithms in your browser, no Minecraft license needed.
